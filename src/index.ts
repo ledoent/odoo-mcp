@@ -29,6 +29,11 @@ import { searchCalendarTool, handleSearchCalendar } from "./tools/calendar.js";
 import { whoamiTool, handleWhoami } from "./tools/whoami.js";
 import { listFinancialReportsTool, handleListFinancialReports, runFinancialReportTool, handleRunFinancialReport } from "./tools/reports.js";
 import { checkReadinessTool, handleCheckReadiness, getReadinessTool, handleGetReadiness } from "./tools/readiness.js";
+import { computeReadiness, loadReadiness } from "./readiness.js";
+import { getReportCapabilities } from "./capabilities.js";
+
+const SERVER_INSTRUCTIONS = `Odoo ERP MCP (read + scoped write).
+Start by reading the odoo://readiness resource (or calling check_readiness): it reports the connection, which financial reports are available (Profit & Loss / Balance Sheet / Cash Flow via MIS Builder, ledgers/aging via OCA, tax), and the security posture. Financial statements are NOT in the core report engine — discover them with list_financial_reports, then run_financial_report by instance name. Writes are scoped to the connected user's Odoo permissions; delete and arbitrary method execution are disabled unless explicitly enabled. Everything is bounded by the connected user's ACLs.`;
 
 async function main() {
   const url = process.env.ODOO_URL;
@@ -74,10 +79,48 @@ async function main() {
     process.exit(1);
   }
 
-  const server = new McpServer({
-    name: "odoo-mcp",
-    version: "0.1.0",
-  });
+  const server = new McpServer(
+    {
+      name: "odoo-mcp",
+      version: "0.1.0",
+    },
+    { instructions: SERVER_INSTRUCTIONS }
+  );
+
+  // Resources: pull-on-demand context (best practice for readiness/capabilities,
+  // so the agent can read state without spending a tool call).
+  server.resource(
+    "readiness",
+    "odoo://readiness",
+    async (uri) => {
+      const report = loadReadiness() ?? (await computeReadiness(odoo));
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(report, null, 2),
+          },
+        ],
+      };
+    }
+  );
+  server.resource(
+    "capabilities",
+    "odoo://capabilities",
+    async (uri) => {
+      const caps = await getReportCapabilities(odoo, false);
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(caps, null, 2),
+          },
+        ],
+      };
+    }
+  );
 
   // Register tools. Safe (read + scoped-write) tools are always on; the two
   // dangerous tools are registered only when explicitly enabled via env.

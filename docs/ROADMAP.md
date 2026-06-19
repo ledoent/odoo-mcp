@@ -61,9 +61,16 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
 - [x] `src/capabilities.ts` — connect-time module/record scan + cache (graceful per-probe degradation).
 - [x] `list_financial_reports` tool — discovery, capability-gated, proven on lab (MIS P&L/BS/CF + 6 OCA ledgers).
 - [~] `run_financial_report` tool — wired + capability-gated + JSON-RPC null-safe
-      path; MIS period columns resolve. FOLLOW-UP: MIS `compute()` returns an
-      empty matrix `body` across the `execute_kw` RPC boundary (works in-process)
-      — resolve via render-export parse or a call_kw body fix.
+      path; MIS period columns resolve. ROOT CAUSE of empty body diagnosed:
+      NOT serialization/render — the restricted user reads 0 `account.move.line`
+      over external RPC because this multi-company DB's GL record rule
+      `[('company_id','in',company_ids)]` doesn't resolve `env.companies` from an
+      RPC session (the browser session sets it; external RPC doesn't, and
+      `allowed_company_ids` context fixes `res.company` reads but not move lines).
+      In-process the same user sees 1686 lines. So MIS body=0 over RPC.
+      FIX PATH (config, not code): a single-company reporting context, a properly
+      company-scoped reporting user/session, or a server-side sudo'd report
+      endpoint — render-export would hit the same GL-visibility wall.
 - [ ] Tool annotations (`readOnlyHint` on all report tools).
 
 **T1b — readiness & ops (DONE):**
@@ -71,9 +78,9 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
       (cached). Reports status ready|degraded|not_ready, connection, security
       posture, per-report availability+reason. Persisted to a local 600 file
       (`ODOO_MCP_STATE_DIR`) — NOT in the ERP (least privilege; no prod pollution).
-- [ ] Best-practice enhancement: also expose readiness as an MCP **resource**
-      (`odoo://readiness`) + summarize in the `initialize` instructions, so the
-      agent pulls it as context without a tool call.
+- [x] Exposed readiness + capabilities as MCP **resources** (`odoo://readiness`,
+      `odoo://capabilities`) + a capability summary in the `initialize`
+      instructions — the agent pulls state as context without a tool call.
 
 **T-setup — can the MCP provision the ERP? (deliberate, gated, NOT runtime):**
 - The least-privilege runtime user must NOT self-provision (installing modules /
