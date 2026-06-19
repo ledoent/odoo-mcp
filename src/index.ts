@@ -27,7 +27,7 @@ import {
 } from "./tools/attachment.js";
 import { searchCalendarTool, handleSearchCalendar } from "./tools/calendar.js";
 import { whoamiTool, handleWhoami } from "./tools/whoami.js";
-import { listFinancialReportsTool, handleListFinancialReports, runFinancialReportTool, handleRunFinancialReport } from "./tools/reports.js";
+import { listFinancialReportsTool, handleListFinancialReports, runFinancialReportTool, handleRunFinancialReport, renderReportTool, handleRenderReport } from "./tools/reports.js";
 import { checkReadinessTool, handleCheckReadiness, getReadinessTool, handleGetReadiness } from "./tools/readiness.js";
 import { computeReadiness, loadReadiness } from "./readiness.js";
 import { getReportCapabilities } from "./capabilities.js";
@@ -148,6 +148,7 @@ async function main() {
     { def: whoamiTool, handler: handleWhoami },
     { def: listFinancialReportsTool, handler: handleListFinancialReports },
     { def: runFinancialReportTool, handler: handleRunFinancialReport },
+    { def: renderReportTool, handler: handleRenderReport },
     { def: checkReadinessTool, handler: handleCheckReadiness },
     { def: getReadinessTool, handler: handleGetReadiness },
   ];

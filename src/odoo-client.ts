@@ -316,6 +316,32 @@ export class OdooClient {
     return data.result;
   }
 
+  /**
+   * Render a QWeb report to PDF via the report controller, using the web session.
+   * Returns the PDF base64-encoded. Requires a password (web session).
+   */
+  async fetchReportPdf(
+    reportName: string,
+    ids: number[]
+  ): Promise<{ base64: string; bytes: number }> {
+    if (!this.config) throw new Error("Not connected.");
+    const sess = await this.openWebSession();
+    const { url } = this.config;
+    const target = new URL(
+      `/report/pdf/${encodeURIComponent(reportName)}/${ids.join(",")}`,
+      url
+    ).toString();
+    const resp = await fetch(target, {
+      headers: { Cookie: sess.cookie },
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!resp.ok) {
+      throw new Error(`Report render failed: HTTP ${resp.status}`);
+    }
+    const buf = Buffer.from(await resp.arrayBuffer());
+    return { base64: buf.toString("base64"), bytes: buf.length };
+  }
+
   async searchRead(
     model: string,
     domain: OdooDomain = [],

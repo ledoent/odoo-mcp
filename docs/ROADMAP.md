@@ -112,8 +112,10 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
 - [x] HTTP transport with **mandatory bearer auth** (ODOO_MCP_HTTP_PORT +
       ODOO_MCP_HTTP_TOKEN; refuses to start unauthenticated; loopback default,
       warns on non-loopback bind). Verified 401/401/200.
-- [ ] Report → PDF (QWeb) tool. DEFERRED — low value vs effort: run_financial_
-      report already returns the figures; PDF is for human consumption.
+- [x] `render_report` — renders any QWeb report to PDF (base64) via the web
+      session (`/report/pdf`); needs ODOO_PASSWORD. Verified: valid %PDF for an
+      invoice as admin. A restricted user gets a clean 403 for records/reports
+      its ACL doesn't permit (correct least-privilege).
 - [ ] Rate limiting / response caps.
 
 Sequence: **capabilities → list_financial_reports → run_financial_report (MIS) →

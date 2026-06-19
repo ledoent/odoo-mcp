@@ -148,3 +148,57 @@ export async function handleRunFinancialReport(
     ],
   };
 }
+
+export const renderReportTool = {
+  name: "render_report",
+  description:
+    "Render an Odoo QWeb report to PDF for the given record ids and return it base64-encoded. Use the report's technical name (report_name), e.g. 'account.report_invoice' or 'sale.report_saleorder'. Requires ODOO_PASSWORD (a web session). Read-only.",
+  inputSchema: {
+    report: z
+      .string()
+      .describe("Report technical name (report_name), e.g. 'account.report_invoice'."),
+    ids: z.string().describe('Comma-separated record IDs to include (e.g. "11818").'),
+  },
+};
+
+export async function handleRenderReport(
+  client: OdooClient,
+  args: Record<string, unknown>
+) {
+  const report = String(args.report || "").trim();
+  if (!report) return errorPayload("report (technical name) is required.");
+  const ids = String(args.ids || "")
+    .split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (!ids.length) return errorPayload("ids is required (comma-separated record IDs).");
+  if (!client.webSessionAvailable)
+    return errorPayload(
+      "render_report requires ODOO_PASSWORD (a web session) to fetch the rendered PDF."
+    );
+
+  const found = (await client.searchRead(
+    "ir.actions.report",
+    [["report_name", "=", report]],
+    ["id", "report_name", "model"],
+    1
+  )) as Array<{ report_name: string; model: string }>;
+  if (!found.length)
+    return errorPayload(
+      `No report named '${report}'. Use the report_name from ir.actions.report.`
+    );
+
+  const pdf = await client.fetchReportPdf(report, ids);
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(
+          { report, model: found[0].model, ids, bytes: pdf.bytes, pdf_base64: pdf.base64 },
+          null,
+          2
+        ),
+      },
+    ],
+  };
+}
