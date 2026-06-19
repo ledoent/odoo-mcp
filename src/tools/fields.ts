@@ -55,7 +55,7 @@ export async function handleGetFields(
     unknown
   >;
 
-  // 필드명 필터링
+  // filter field names
   const filter = args.filter as string | undefined;
   let filtered = fields;
   if (filter) {

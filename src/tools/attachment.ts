@@ -45,14 +45,14 @@ export async function handleListAttachments(
       const parsed = JSON.parse(args.domain as string);
       if (!Array.isArray(parsed)) {
         return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: "domain은 JSON 배열이어야 합니다" }, null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: "domain must be a JSON array" }, null, 2) }],
           isError: true,
         };
       }
       extraDomain = parsed as OdooDomain;
     } catch {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: "domain JSON 파싱 실패. 올바른 JSON 배열을 입력하세요" }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "Failed to parse domain JSON. Please provide a valid JSON array" }, null, 2) }],
         isError: true,
       };
     }
@@ -115,14 +115,14 @@ export const uploadAttachmentTool = {
   },
 };
 
-// 순수 base64 문자만 허용 (whitespace 제거 후), padding은 최대 2개
+// Allow only pure base64 characters (after stripping whitespace); at most 2 padding chars
 const BASE64_REGEX = /^[A-Za-z0-9+/]*={0,2}$/;
 
-// 업로드 허용 최대 크기: 25MB (base64 인코딩 시 ~33.8MB)
+// Maximum allowed upload size: 25MB (~33.8MB when base64-encoded)
 const MAX_UPLOAD_SIZE_MB = 25;
 const MAX_UPLOAD_BASE64_CHARS = Math.ceil(MAX_UPLOAD_SIZE_MB * 1024 * 1024 * (4 / 3));
 
-// 파일명 보안 검증: 경로 순회 및 위험 문자 차단
+// Filename security check: block path traversal and dangerous characters
 const UNSAFE_FILENAME_REGEX = /[/\\:*?"<>|]/;
 
 export async function handleUploadAttachment(
@@ -132,35 +132,35 @@ export async function handleUploadAttachment(
   const name = args.name as string;
   const data = args.data as string;
 
-  // 파일명 검증
+  // Validate the filename
   if (!name || name.trim() === "") {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "파일명이 비어 있습니다" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "Filename is empty" }, null, 2) }],
       isError: true,
     };
   }
   if (UNSAFE_FILENAME_REGEX.test(name) || name.includes("..")) {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "파일명에 허용되지 않는 문자가 포함되어 있습니다 (/, \\, .., :, *, ?, \", <, >, | 불가)" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "Filename contains disallowed characters (/, \\, .., :, *, ?, \", <, >, | are not allowed)" }, null, 2) }],
       isError: true,
     };
   }
 
-  // base64 정규화: whitespace 제거
+  // Normalize base64: strip whitespace
   const cleanData = data.replace(/\s/g, "");
 
-  // 크기 제한 검증
+  // Validate the size limit
   if (cleanData.length > MAX_UPLOAD_BASE64_CHARS) {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: `파일이 너무 큽니다. 최대 ${MAX_UPLOAD_SIZE_MB}MB까지 업로드 가능합니다` }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: `File is too large. The maximum upload size is ${MAX_UPLOAD_SIZE_MB}MB` }, null, 2) }],
       isError: true,
     };
   }
 
-  // base64 유효성 검증
+  // Validate base64 format
   if (!BASE64_REGEX.test(cleanData)) {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "유효하지 않은 base64 데이터입니다" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid base64 data" }, null, 2) }],
       isError: true,
     };
   }
@@ -210,7 +210,7 @@ export async function handleDownloadAttachment(
 ) {
   const id = args.id as number;
 
-  // 먼저 메타데이터만 조회하여 파일 크기 확인
+  // First read only the metadata to check the file size
   const metaRecords = (await client.read("ir.attachment", [id], [
     "name",
     "mimetype",
@@ -222,7 +222,7 @@ export async function handleDownloadAttachment(
       content: [
         {
           type: "text" as const,
-          text: JSON.stringify({ error: `첨부파일 ID ${id}를 찾을 수 없습니다` }, null, 2),
+          text: JSON.stringify({ error: `Attachment with ID ${id} not found` }, null, 2),
         },
       ],
       isError: true,
@@ -239,7 +239,7 @@ export async function handleDownloadAttachment(
           type: "text" as const,
           text: JSON.stringify(
             {
-              error: `파일이 너무 큽니다 (${(fileSize / 1024 / 1024).toFixed(1)}MB). 최대 ${MAX_DOWNLOAD_SIZE_MB}MB까지 다운로드 가능합니다`,
+              error: `File is too large (${(fileSize / 1024 / 1024).toFixed(1)}MB). The maximum download size is ${MAX_DOWNLOAD_SIZE_MB}MB`,
               id,
               name: meta.name,
               mimetype: meta.mimetype,
@@ -254,7 +254,7 @@ export async function handleDownloadAttachment(
     };
   }
 
-  // 크기 확인 후 실제 데이터 조회
+  // After the size check, read the actual data
   const records = (await client.read("ir.attachment", [id], [
     "name",
     "mimetype",
@@ -267,7 +267,7 @@ export async function handleDownloadAttachment(
       content: [
         {
           type: "text" as const,
-          text: JSON.stringify({ error: `첨부파일 ID ${id}를 찾을 수 없습니다` }, null, 2),
+          text: JSON.stringify({ error: `Attachment with ID ${id} not found` }, null, 2),
         },
       ],
       isError: true,

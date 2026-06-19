@@ -147,3 +147,6 @@ Harness base: `probe.mjs` (real MCP stdio client) → grow into `tests/`.
   `scripts/make-mcp-user.py` (odoo shell). **Note: this Odoo caps API-key
   duration at 1 day** — regenerate per run.
 - Connection: `ODOO_URL` + `ODOO_DB` + `ODOO_USER` (login) + `ODOO_API_KEY`.
+
+## i18n
+- [x] All residual Korean strings/comments translated to English (64 lines).

@@ -31,7 +31,7 @@ export async function handleUpdateRecord(
     values = JSON.parse(args.values as string);
   } catch {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "values JSON 파싱 실패. 올바른 JSON을 입력하세요" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "Failed to parse values JSON. Please provide valid JSON" }, null, 2) }],
       isError: true,
     };
   }

@@ -83,7 +83,7 @@ export class OdooClient {
     if (users.length > 0 && Array.isArray(users[0].partner_id)) {
       this._partnerId = users[0].partner_id[0] as number;
     } else {
-      throw new Error("현재 사용자의 partner_id를 조회할 수 없습니다");
+      throw new Error("Could not resolve the current user's partner_id.");
     }
     return this._partnerId;
   }
@@ -94,7 +94,7 @@ export class OdooClient {
     // web-session report path; an API key alone cannot open a web session.
     this.webPassword = password || null;
 
-    // commonClient 캐싱
+    // cache the common client
     if (!this.commonClient) {
       this.commonClient = createClient(url, "/xmlrpc/2/common");
     }
