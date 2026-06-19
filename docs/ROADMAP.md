@@ -60,17 +60,13 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
 **T1 — close the QuickBooks gap (financial reports):**
 - [x] `src/capabilities.ts` — connect-time module/record scan + cache (graceful per-probe degradation).
 - [x] `list_financial_reports` tool — discovery, capability-gated, proven on lab (MIS P&L/BS/CF + 6 OCA ledgers).
-- [~] `run_financial_report` tool — wired + capability-gated + JSON-RPC null-safe
-      path; MIS period columns resolve. ROOT CAUSE of empty body diagnosed:
-      NOT serialization/render — the restricted user reads 0 `account.move.line`
-      over external RPC because this multi-company DB's GL record rule
-      `[('company_id','in',company_ids)]` doesn't resolve `env.companies` from an
-      RPC session (the browser session sets it; external RPC doesn't, and
-      `allowed_company_ids` context fixes `res.company` reads but not move lines).
-      In-process the same user sees 1686 lines. So MIS body=0 over RPC.
-      FIX PATH (config, not code): a single-company reporting context, a properly
-      company-scoped reporting user/session, or a server-side sudo'd report
-      endpoint — render-export would hit the same GL-visibility wall.
+- [x] `run_financial_report` tool — returns REAL figures. Root cause of the
+      earlier empty body was multi-company: the GL record rule needs
+      `env.companies`, which only a **web session** (`/web/dataset/call_kw`)
+      establishes — the external `/xmlrpc` + `/jsonrpc` endpoints don't.
+      Added `OdooClient.callWebKw` (session auth + call_kw); the tool uses it when
+      a password is available (ODOO_PASSWORD), else falls back to columns-only
+      with a clear note. Verified: 11 P&L rows, figures matching the browser.
 - [ ] Tool annotations (`readOnlyHint` on all report tools).
 
 **T1b — readiness & ops (DONE):**

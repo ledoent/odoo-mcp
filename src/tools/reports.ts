@@ -85,12 +85,34 @@ export async function handleRunFinancialReport(
       `No MIS report instance named '${name}'. Call list_financial_reports for valid names.`
     );
 
-  // Use JSON-RPC: compute() returns a null-laden matrix that XML-RPC can't marshal.
-  const res = (await client.callKwJson(
-    "mis.report.instance",
-    "compute",
-    [[found[0].id]]
-  )) as { header?: unknown[]; body?: unknown[] };
+  // Compute the matrix. The web-session path (/web/dataset/call_kw) establishes
+  // env.companies so multi-company GL record rules return real figures; the
+  // JSON-RPC path can't (it would return period columns but an empty body on a
+  // multi-company DB). JSON-RPC also avoids the XML-RPC null-marshal failure.
+  const id = found[0].id;
+  let res: { header?: unknown[]; body?: unknown[] };
+  let via: string;
+  if (client.webSessionAvailable) {
+    try {
+      res = (await client.callWebKw("mis.report.instance", "compute", [[id]])) as {
+        header?: unknown[];
+        body?: unknown[];
+      };
+      via = "web-session";
+    } catch {
+      res = (await client.callKwJson("mis.report.instance", "compute", [[id]])) as {
+        header?: unknown[];
+        body?: unknown[];
+      };
+      via = "jsonrpc-fallback";
+    }
+  } else {
+    res = (await client.callKwJson("mis.report.instance", "compute", [[id]])) as {
+      header?: unknown[];
+      body?: unknown[];
+    };
+    via = "jsonrpc-fallback";
+  }
 
   const columns: string[] = [];
   for (const hrow of (res.header || []) as Array<{ cols?: unknown[] }>) {
@@ -111,13 +133,13 @@ export async function handleRunFinancialReport(
     ),
   }));
 
-  const out: Record<string, unknown> = { instance: name, columns, rows };
-  if (rows.length === 0) {
+  const out: Record<string, unknown> = { instance: name, columns, rows, via };
+  if (rows.length === 0 && via !== "web-session") {
     out.note =
-      "Period columns resolved but MIS Builder returned no line items over RPC. " +
-      "Known MIS compute()/execute_kw quirk (the matrix body is built lazily " +
-      "in-process); resolution tracked in docs/ROADMAP.md (render-export parse " +
-      "or call_kw body fix). The capability gate and period resolution are correct.";
+      "Period columns resolved but no line items: on a multi-company database the " +
+      "GL record rule needs env.companies, which only the web session establishes. " +
+      "Set ODOO_PASSWORD (in addition to / instead of ODOO_API_KEY) so the server " +
+      "can open a web session and return real figures.";
   }
 
   return {
