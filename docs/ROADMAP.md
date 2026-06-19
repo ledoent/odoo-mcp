@@ -99,7 +99,9 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
 - [ ] Per-model allow-list (`ODOO_MCP_ALLOWED_MODELS`) — app-level defence over
       the Odoo ACL.
 - [ ] Pagination cursors; bulk create/update.
-- [ ] CI + `tests/` suite (the upstream repo shipped none).
+- [x] `tests/lab-suite.mjs` — 16-assertion MCP suite (init/resources, security
+      gates, readiness, read, scoped write, capability-gated reports, delete-block);
+      16/16 PASS on lab Odoo 19. CI wiring still TODO.
 - [ ] Richer `get_fields` (relations + selection values) for agent grounding.
 
 **T3 — deployment:**
