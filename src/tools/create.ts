@@ -27,7 +27,7 @@ export async function handleCreateRecord(
     parsed = JSON.parse(args.values as string);
   } catch {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "values JSON 파싱 실패. 올바른 JSON을 입력하세요" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "Failed to parse values JSON. Provide valid JSON." }, null, 2) }],
       isError: true,
     };
   }
@@ -35,19 +35,19 @@ export async function handleCreateRecord(
   if (Array.isArray(parsed)) {
     if (parsed.length === 0) {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: "빈 배열입니다. 생성할 레코드를 입력하세요" }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "Empty array. Provide at least one record to create." }, null, 2) }],
         isError: true,
       };
     }
 
     if (parsed.length > MAX_BATCH_SIZE) {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: `배치 생성은 최대 ${MAX_BATCH_SIZE}건까지 가능합니다. 요청: ${parsed.length}건` }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: `Batch create is limited to ${MAX_BATCH_SIZE} records; got ${parsed.length}.` }, null, 2) }],
         isError: true,
       };
     }
 
-    // Odoo 네이티브 배치 create (단일 RPC 호출)
+    // Odoo native batch create (single RPC call)
     const ids = await client.createBatch(model, parsed as Record<string, unknown>[]);
     return {
       content: [

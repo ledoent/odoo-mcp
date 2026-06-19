@@ -27,6 +27,18 @@ import {
 } from "./tools/attachment.js";
 import { searchCalendarTool, handleSearchCalendar } from "./tools/calendar.js";
 import { whoamiTool, handleWhoami } from "./tools/whoami.js";
+import { listFinancialReportsTool, handleListFinancialReports, runFinancialReportTool, handleRunFinancialReport, renderReportTool, handleRenderReport } from "./tools/reports.js";
+import { checkReadinessTool, handleCheckReadiness, getReadinessTool, handleGetReadiness } from "./tools/readiness.js";
+import { computeReadiness, loadReadiness } from "./readiness.js";
+import { getReportCapabilities } from "./capabilities.js";
+import { isSetupEnabled } from "./security.js";
+import {
+  setupInstallModulesTool, handleSetupInstallModules,
+  setupCreateUserTool, handleSetupCreateUser,
+} from "./tools/setup.js";
+
+const SERVER_INSTRUCTIONS = `Odoo ERP MCP (read + scoped write).
+Start by reading the odoo://readiness resource (or calling check_readiness): it reports the connection, which financial reports are available (Profit & Loss / Balance Sheet / Cash Flow via MIS Builder, ledgers/aging via OCA, tax), and the security posture. Financial statements are NOT in the core report engine — discover them with list_financial_reports, then run_financial_report by instance name. Writes are scoped to the connected user's Odoo permissions; delete and arbitrary method execution are disabled unless explicitly enabled. Everything is bounded by the connected user's ACLs.`;
 
 async function main() {
   const url = process.env.ODOO_URL;
@@ -72,10 +84,48 @@ async function main() {
     process.exit(1);
   }
 
-  const server = new McpServer({
-    name: "odoo-mcp",
-    version: "0.1.0",
-  });
+  const server = new McpServer(
+    {
+      name: "odoo-mcp",
+      version: "0.1.0",
+    },
+    { instructions: SERVER_INSTRUCTIONS }
+  );
+
+  // Resources: pull-on-demand context (best practice for readiness/capabilities,
+  // so the agent can read state without spending a tool call).
+  server.resource(
+    "readiness",
+    "odoo://readiness",
+    async (uri) => {
+      const report = loadReadiness() ?? (await computeReadiness(odoo));
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(report, null, 2),
+          },
+        ],
+      };
+    }
+  );
+  server.resource(
+    "capabilities",
+    "odoo://capabilities",
+    async (uri) => {
+      const caps = await getReportCapabilities(odoo, false);
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(caps, null, 2),
+          },
+        ],
+      };
+    }
+  );
 
   // Register tools. Safe (read + scoped-write) tools are always on; the two
   // dangerous tools are registered only when explicitly enabled via env.
@@ -96,6 +146,11 @@ async function main() {
     { def: downloadAttachmentTool, handler: handleDownloadAttachment },
     { def: searchCalendarTool, handler: handleSearchCalendar },
     { def: whoamiTool, handler: handleWhoami },
+    { def: listFinancialReportsTool, handler: handleListFinancialReports },
+    { def: runFinancialReportTool, handler: handleRunFinancialReport },
+    { def: renderReportTool, handler: handleRenderReport },
+    { def: checkReadinessTool, handler: handleCheckReadiness },
+    { def: getReadinessTool, handler: handleGetReadiness },
   ];
 
   // delete_record: off unless ODOO_MCP_ENABLE_DELETE is set.
@@ -117,8 +172,30 @@ async function main() {
     );
   }
 
+  // setup_* provisioning tools: double-gated (env flag here + admin check at call
+  // time). Default off — provisioning is a deliberate step, not runtime surface.
+  if (isSetupEnabled()) {
+    tools.push({ def: setupInstallModulesTool, handler: handleSetupInstallModules });
+    tools.push({ def: setupCreateUserTool, handler: handleSetupCreateUser });
+    console.error(
+      "[security] setup_* tools ENABLED (admin-only; each call re-checks base.group_system)."
+    );
+  }
+
+  // Tool annotations: let MCP clients render/gate tools by behaviour.
+  const WRITE_TOOLS = new Set([
+    "create_record", "update_record", "post_message", "upload_attachment",
+  ]);
+  const DESTRUCTIVE_TOOLS = new Set([
+    "delete_record", "execute_method", "setup_install_modules", "setup_create_user",
+  ]);
+
   for (const { def, handler } of tools) {
-    server.tool(def.name, def.description, def.inputSchema, async (args: Record<string, unknown>) => {
+    const annotations = {
+      readOnlyHint: !WRITE_TOOLS.has(def.name) && !DESTRUCTIVE_TOOLS.has(def.name),
+      destructiveHint: DESTRUCTIVE_TOOLS.has(def.name),
+    };
+    server.registerTool(def.name, { description: def.description, inputSchema: def.inputSchema, annotations }, async (args: Record<string, unknown>) => {
       try {
         return await handler(odoo, args as Record<string, unknown>);
       } catch (err) {
@@ -142,8 +219,58 @@ async function main() {
     });
   }
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  // Transport: stdio by default. HTTP only when explicitly configured, and then
+  // ALWAYS behind bearer auth (the audit flagged that the raw HTTP transport has
+  // no built-in auth — this refuses to start an unauthenticated listener).
+  const httpPort = process.env.ODOO_MCP_HTTP_PORT;
+  if (httpPort) {
+    const token = process.env.ODOO_MCP_HTTP_TOKEN;
+    if (!token) {
+      console.error(
+        "[security] ODOO_MCP_HTTP_PORT requires ODOO_MCP_HTTP_TOKEN — refusing to start an unauthenticated HTTP listener."
+      );
+      process.exit(1);
+    }
+    const host = process.env.ODOO_MCP_HTTP_HOST || "127.0.0.1";
+    const { StreamableHTTPServerTransport } = await import(
+      "@modelcontextprotocol/sdk/server/streamableHttp.js"
+    );
+    const { randomUUID, timingSafeEqual } = await import("node:crypto");
+    const http = await import("node:http");
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
+    await server.connect(transport);
+    const tokenBuf = Buffer.from(token);
+    const authorized = (header: string | undefined): boolean => {
+      const provided = header?.startsWith("Bearer ") ? header.slice(7) : "";
+      const provBuf = Buffer.from(provided);
+      return (
+        provBuf.length === tokenBuf.length && timingSafeEqual(provBuf, tokenBuf)
+      );
+    };
+    const httpServer = http.createServer(async (req, res) => {
+      if (!authorized(req.headers["authorization"])) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      await transport.handleRequest(req, res);
+    });
+    httpServer.listen(Number(httpPort), host, () => {
+      console.error(
+        `[odoo-mcp] HTTP transport on http://${host}:${httpPort} (bearer auth required)`
+      );
+      if (host !== "127.0.0.1" && host !== "localhost") {
+        console.error(
+          "[security] WARNING: binding a non-loopback host — front with TLS; the bearer token is the only gate."
+        );
+      }
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  }
 }
 
 main().catch((err) => {

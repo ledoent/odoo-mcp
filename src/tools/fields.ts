@@ -1,19 +1,27 @@
 import { z } from "zod";
 import type { OdooClient } from "../odoo-client.js";
 
-const DEFAULT_ATTRIBUTES = ["string", "type", "required", "readonly", "relation"];
+const DEFAULT_ATTRIBUTES = [
+  "string",
+  "type",
+  "required",
+  "readonly",
+  "relation", // related model for many2one/one2many/many2many
+  "selection", // option values for selection fields
+  "help",
+];
 
 export const getFieldsTool = {
   name: "get_fields",
   description:
-    "Get field definitions for an Odoo model. Returns field names, types, labels, and other metadata. Default: returns string, type, required, readonly, relation only (compact mode).",
+    "Get field definitions for an Odoo model — names, types, labels, plus the related model (relation) and selection option values, so an agent can ground create/update calls. Default returns a compact attribute set; pass all_attributes for everything.",
   inputSchema: {
     model: z.string().describe("Odoo model name (e.g., 'res.partner')"),
     attributes: z
       .string()
       .optional()
       .describe(
-        'Comma-separated field attributes to return (e.g., "string,type,required,help"). Default: "string,type,required,readonly,relation"'
+        'Comma-separated field attributes to return. Default: "string,type,required,readonly,relation,selection,help"'
       ),
     filter: z
       .string()
@@ -25,7 +33,7 @@ export const getFieldsTool = {
       .boolean()
       .optional()
       .describe(
-        "true로 설정하면 모든 속성을 반환합니다 (응답이 매우 클 수 있음). Default: false"
+        "Return all field attributes (response can be very large). Default: false"
       ),
   },
 };
@@ -47,7 +55,7 @@ export async function handleGetFields(
     unknown
   >;
 
-  // 필드명 필터링
+  // filter field names
   const filter = args.filter as string | undefined;
   let filtered = fields;
   if (filter) {

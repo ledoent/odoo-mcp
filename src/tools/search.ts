@@ -31,7 +31,7 @@ export const searchRecordsTool = {
     include_total: z
       .boolean()
       .optional()
-      .describe("true이면 정확한 총 레코드 수(total_count)를 반환. 추가 RPC 호출 발생. 기본값: false"),
+      .describe("If true, returns the exact total record count (total_count). Incurs an extra RPC call. Default: false"),
   },
 };
 
@@ -46,7 +46,7 @@ export async function handleSearchRecords(
       domain = JSON.parse(args.domain as string);
     } catch {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: "domain JSON 파싱 실패. 올바른 JSON 배열을 입력하세요" }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "Failed to parse domain JSON. Please provide a valid JSON array" }, null, 2) }],
         isError: true,
       };
     }
@@ -66,7 +66,7 @@ export async function handleSearchRecords(
   let totalCount: number | undefined;
 
   if (includeTotal) {
-    // include_total=true: searchRead + count 병렬 호출
+    // include_total=true: searchRead + count in parallel
     const [searchResult, countResult] = await Promise.all([
       client.searchRead(model, domain, fields, limit, offset, order),
       client.count(model, domain),
@@ -75,7 +75,7 @@ export async function handleSearchRecords(
     totalCount = countResult;
     hasMore = offset + records.length < totalCount;
   } else {
-    // include_total=false: limit+1 트릭으로 has_more 판단 (count RPC 호출 제거)
+    // include_total=false: determine has_more via the limit+1 trick (avoids a count RPC call)
     records = (await client.searchRead(model, domain, fields, limit + 1, offset, order)) as unknown[];
     hasMore = records.length > limit;
     if (hasMore) records.pop();
@@ -91,7 +91,7 @@ export async function handleSearchRecords(
           offset,
           limit,
           has_more: hasMore,
-          ...(!fieldsSpecified ? { notice: "fields 미지정 — 기본 필드(id,name,display_name)만 반환됨. 필요한 필드를 지정하세요" } : {}),
+          ...(!fieldsSpecified ? { notice: "fields not specified — only the default fields (id,name,display_name) are returned. Specify the fields you need" } : {}),
           records,
         }, null, 2),
       },

@@ -11,10 +11,10 @@ export async function handleWhoami(
   client: OdooClient,
   _args: Record<string, unknown>
 ) {
-  // 서버 버전 조회
+  // Get the server version
   const version = await client.getVersion();
 
-  // 현재 사용자 정보 조회
+  // Get the current user's info
   const uid = client.getUid();
   const users = (await client.searchRead(
     "res.users",
@@ -47,7 +47,7 @@ export async function handleWhoami(
 
   const user = users[0] as Record<string, unknown>;
 
-  // 권한 그룹 이름 조회 — 앱 수준 그룹만 (full_name에 "/"가 포함된 것 = 앱/역할 그룹)
+  // Get permission group names — app-level groups only (full_name containing "/" = app/role group)
   const groupIds = (user.group_ids as number[]) || [];
   let groups: string[] = [];
   if (groupIds.length > 0) {
@@ -59,7 +59,7 @@ export async function handleWhoami(
     )) as Array<Record<string, unknown>>;
     groups = groupRecords
       .map((g) => g.full_name as string)
-      .filter((name) => name.includes(" / "))  // 앱/역할 그룹만 (내부 기술 그룹 제외)
+      .filter((name) => name.includes(" / "))  // app/role groups only (excludes internal technical groups)
       .sort();
   }
 

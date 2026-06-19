@@ -46,13 +46,13 @@ export async function handleNameSearch(
       parsed = JSON.parse(args.domain as string);
     } catch {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: "domain JSON 파싱 실패. 올바른 JSON 배열을 입력하세요" }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "Failed to parse domain JSON. Please provide a valid JSON array" }, null, 2) }],
         isError: true,
       };
     }
     if (!Array.isArray(parsed)) {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: "domain은 JSON 배열이어야 합니다 (예: [[\"is_company\",\"=\",true]])" }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "domain must be a JSON array (e.g., [[\"is_company\",\"=\",true]])" }, null, 2) }],
         isError: true,
       };
     }
@@ -63,7 +63,7 @@ export async function handleNameSearch(
 
   if (!Array.isArray(result)) {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "예상치 못한 응답 형식", raw: result }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "Unexpected response format", raw: result }, null, 2) }],
       isError: true,
     };
   }

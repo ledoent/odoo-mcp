@@ -29,7 +29,7 @@ export async function handleListModels(
   const filter = args.filter as string | undefined;
   const includeTransient = (args.include_transient as boolean) ?? false;
 
-  // 서버사이드 필터링 domain 구성
+  // Build the server-side filtering domain
   const domain: OdooDomain = [];
   if (!includeTransient) {
     domain.push(["transient", "=", false]);

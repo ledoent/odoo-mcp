@@ -5,34 +5,34 @@ import type { OdooDomain } from "../types.js";
 export const searchCalendarTool = {
   name: "search_calendar",
   description:
-    "캘린더 일정을 조회합니다. 기본적으로 현재 인증된 사용자 본인의 일정 및 본인이 참석자로 포함된 일정만 반환합니다. all_events를 true로 설정하면 전체 일정을 조회할 수 있습니다.",
+    "Search calendar events. By default, returns only events owned by the currently authenticated user or events where they are an attendee. Set all_events to true to query all events.",
   inputSchema: {
     all_events: z
       .boolean()
       .optional()
       .describe(
-        "true로 설정하면 모든 사용자의 일정을 조회합니다. 기본값: false (본인 일정만)"
+        "If true, queries every user's events. Default: false (only your own events)"
       ),
     domain: z
       .string()
       .optional()
       .describe(
-        '추가 필터 도메인 (JSON 배열). 예: \'[["start",">=","2026-03-01"]]\'. 기본 사용자 필터와 AND로 결합됩니다'
+        'Additional filter domain (JSON array). Example: \'[["start",">=","2026-03-01"]]\'. Combined with the default user filter using AND'
       ),
     fields: z
       .string()
       .optional()
       .describe(
-        '조회할 필드 (쉼표 구분). 기본값: "name,start,stop,allday,user_id,partner_ids,location,description"'
+        'Fields to retrieve (comma-separated). Default: "name,start,stop,allday,user_id,partner_ids,location,description"'
       ),
     limit: z
       .number()
       .optional()
-      .describe("최대 조회 건수. 기본값: 40"),
+      .describe("Maximum number of records to retrieve. Default: 40"),
     order: z
       .string()
       .optional()
-      .describe('정렬 순서. 기본값: "start asc"'),
+      .describe('Sort order. Default: "start asc"'),
   },
 };
 
@@ -58,7 +58,7 @@ export async function handleSearchCalendar(
           {
             type: "text" as const,
             text: JSON.stringify(
-              { error: "domain JSON 파싱 실패. 올바른 JSON 배열을 입력하세요" },
+              { error: "Failed to parse domain JSON. Please provide a valid JSON array" },
               null,
               2
             ),
@@ -74,7 +74,7 @@ export async function handleSearchCalendar(
   if (!allEvents) {
     const partnerId = await client.getPartnerId();
     const uid = client.uid;
-    // 주최자(user_id)가 나이거나, 참석자(partner_ids)에 내가 포함된 일정
+    // Events where I am the organizer (user_id) or an attendee (partner_ids)
     domain.push("|");
     domain.push(["user_id", "=", uid]);
     domain.push(["partner_ids", "in", [partnerId]]);
@@ -96,7 +96,7 @@ export async function handleSearchCalendar(
         text: JSON.stringify(
           {
             count: records.length,
-            filter: allEvents ? "전체 일정" : "내 일정만",
+            filter: allEvents ? "all events" : "my events only",
             records,
           },
           null,
