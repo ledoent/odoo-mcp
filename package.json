@@ -1,7 +1,7 @@
 {
   "name": "odoo-mcp",
   "version": "0.1.0",
-  "description": "MCP server for Odoo ERP — standard XML-RPC, no addons required",
+  "description": "MCP server for Odoo ERP \u2014 standard XML-RPC, no addons required",
   "author": "intellieffect",
   "license": "MIT",
   "type": "module",
@@ -33,7 +33,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
-    "xmlrpc": "^1.3.2"
+    "xmlrpc": "^1.3.2",
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

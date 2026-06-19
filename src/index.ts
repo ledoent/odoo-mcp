@@ -1,6 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { OdooClient } from "./odoo-client.js";
+import {
+  assertTransportSecurity,
+  sanitizeErrorMessage,
+  isDeleteEnabled,
+  isMethodCallsEnabled,
+} from "./security.js";
 
 import { searchRecordsTool, handleSearchRecords } from "./tools/search.js";
 import { readRecordTool, handleReadRecord } from "./tools/read.js";
@@ -54,6 +60,9 @@ async function main() {
     process.exit(1);
   }
 
+  // Refuse cleartext credentials to a non-loopback host.
+  assertTransportSecurity(url);
+
   const odoo = new OdooClient({ url, db, apiKey, user, password }, timeout);
 
   try {
@@ -68,18 +77,17 @@ async function main() {
     version: "0.1.0",
   });
 
-  // Register tools
+  // Register tools. Safe (read + scoped-write) tools are always on; the two
+  // dangerous tools are registered only when explicitly enabled via env.
   const tools = [
     { def: searchRecordsTool, handler: handleSearchRecords },
     { def: readRecordTool, handler: handleReadRecord },
     { def: createRecordTool, handler: handleCreateRecord },
     { def: updateRecordTool, handler: handleUpdateRecord },
-    { def: deleteRecordTool, handler: handleDeleteRecord },
     { def: countRecordsTool, handler: handleCountRecords },
     { def: listModelsTool, handler: handleListModels },
     { def: getFieldsTool, handler: handleGetFields },
     { def: searchGroupedTool, handler: handleSearchGrouped },
-    { def: executeMethodTool, handler: handleExecuteMethod },
     { def: nameSearchTool, handler: handleNameSearch },
     { def: getMessagesTool, handler: handleGetMessages },
     { def: postMessageTool, handler: handlePostMessage },
@@ -90,17 +98,39 @@ async function main() {
     { def: whoamiTool, handler: handleWhoami },
   ];
 
+  // delete_record: off unless ODOO_MCP_ENABLE_DELETE is set.
+  if (isDeleteEnabled()) {
+    tools.push({ def: deleteRecordTool, handler: handleDeleteRecord });
+  } else {
+    console.error(
+      "[security] delete_record is DISABLED (set ODOO_MCP_ENABLE_DELETE=true to enable)."
+    );
+  }
+
+  // execute_method: off unless an allow-list is configured via
+  // ODOO_MCP_ALLOWED_METHODS (the handler enforces the allow-list per call).
+  if (isMethodCallsEnabled()) {
+    tools.push({ def: executeMethodTool, handler: handleExecuteMethod });
+  } else {
+    console.error(
+      "[security] execute_method is DISABLED (set ODOO_MCP_ALLOWED_METHODS to an allow-list to enable)."
+    );
+  }
+
   for (const { def, handler } of tools) {
     server.tool(def.name, def.description, def.inputSchema, async (args: Record<string, unknown>) => {
       try {
         return await handler(odoo, args as Record<string, unknown>);
       } catch (err) {
+        const raw = (err as Error).message || String(err);
+        // Full detail to stderr only; never forward server tracebacks to the client.
+        console.error(`[odoo-mcp] tool ${def.name} failed:`, raw);
         return {
           content: [
             {
               type: "text" as const,
               text: JSON.stringify(
-                { error: (err as Error).message },
+                { error: sanitizeErrorMessage(raw) },
                 null,
                 2
               ),

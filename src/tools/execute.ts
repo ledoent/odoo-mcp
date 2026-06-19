@@ -1,21 +1,11 @@
 import { z } from "zod";
 import type { OdooClient } from "../odoo-client.js";
-
-// 전용 도구가 있는 위험한 메서드는 execute_method로 호출 불가
-// create_record, update_record, delete_record 도구를 사용할 것
-const BLOCKED_METHODS = new Set([
-  "create",
-  "write",
-  "unlink",
-  "copy",
-  "name_create",
-  "web_save",
-]);
+import { isMethodAllowed } from "../security.js";
 
 export const executeMethodTool = {
   name: "execute_method",
   description:
-    "Execute a method on Odoo model records. Used for workflow actions (action_confirm, action_post, button_validate, etc.) and custom business logic methods. Note: create/write/unlink are blocked — use dedicated tools instead.",
+    "Execute a method on Odoo model records (workflow actions such as action_confirm, action_post, button_validate). Only (model, method) pairs in the ODOO_MCP_ALLOWED_METHODS allow-list are permitted; anything else is rejected. Use create_record/update_record/delete_record for CRUD.",
   inputSchema: {
     model: z
       .string()
@@ -52,26 +42,27 @@ export async function handleExecuteMethod(
 
   if (!model) {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "model은 필수입니다" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "model is required" }, null, 2) }],
       isError: true,
     };
   }
 
   if (!method) {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "method는 필수입니다" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "method is required" }, null, 2) }],
       isError: true,
     };
   }
 
-  if (BLOCKED_METHODS.has(method)) {
+  // Allow-list gate: only explicitly permitted (model, method) pairs run.
+  if (!isMethodAllowed(model, method)) {
     return {
       content: [
         {
           type: "text" as const,
           text: JSON.stringify(
             {
-              error: `'${method}' 메서드는 execute_method로 호출할 수 없습니다. 전용 도구를 사용하세요: create_record, update_record, delete_record`,
+              error: `Method '${model}.${method}' is not permitted. Add it to ODOO_MCP_ALLOWED_METHODS to allow it.`,
             },
             null,
             2
@@ -89,14 +80,14 @@ export async function handleExecuteMethod(
 
   if (idStrings.length === 0) {
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "ids가 비어있습니다. 하나 이상의 레코드 ID를 입력하세요" }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "ids is empty. Provide at least one record ID" }, null, 2) }],
       isError: true,
     };
   }
 
   const ids = idStrings.map((s) => {
     const id = parseInt(s, 10);
-    if (isNaN(id) || id <= 0) throw new Error(`유효하지 않은 레코드 ID: "${s}"`);
+    if (isNaN(id) || id <= 0) throw new Error(`Invalid record ID: "${s}"`);
     return id;
   });
 
@@ -106,7 +97,7 @@ export async function handleExecuteMethod(
       extraArgs = JSON.parse(args.args as string);
     } catch {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: "args JSON 파싱 실패. 올바른 JSON 배열을 입력하세요" }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "Failed to parse args JSON. Provide a valid JSON array" }, null, 2) }],
         isError: true,
       };
     }
@@ -129,7 +120,7 @@ export async function handleExecuteMethod(
       kwargs = JSON.parse(args.kwargs as string);
     } catch {
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: "kwargs JSON 파싱 실패. 올바른 JSON 객체를 입력하세요" }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "Failed to parse kwargs JSON. Provide a valid JSON object" }, null, 2) }],
         isError: true,
       };
     }
