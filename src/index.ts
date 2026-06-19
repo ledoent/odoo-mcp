@@ -201,8 +201,58 @@ async function main() {
     });
   }
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  // Transport: stdio by default. HTTP only when explicitly configured, and then
+  // ALWAYS behind bearer auth (the audit flagged that the raw HTTP transport has
+  // no built-in auth — this refuses to start an unauthenticated listener).
+  const httpPort = process.env.ODOO_MCP_HTTP_PORT;
+  if (httpPort) {
+    const token = process.env.ODOO_MCP_HTTP_TOKEN;
+    if (!token) {
+      console.error(
+        "[security] ODOO_MCP_HTTP_PORT requires ODOO_MCP_HTTP_TOKEN — refusing to start an unauthenticated HTTP listener."
+      );
+      process.exit(1);
+    }
+    const host = process.env.ODOO_MCP_HTTP_HOST || "127.0.0.1";
+    const { StreamableHTTPServerTransport } = await import(
+      "@modelcontextprotocol/sdk/server/streamableHttp.js"
+    );
+    const { randomUUID, timingSafeEqual } = await import("node:crypto");
+    const http = await import("node:http");
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
+    await server.connect(transport);
+    const tokenBuf = Buffer.from(token);
+    const authorized = (header: string | undefined): boolean => {
+      const provided = header?.startsWith("Bearer ") ? header.slice(7) : "";
+      const provBuf = Buffer.from(provided);
+      return (
+        provBuf.length === tokenBuf.length && timingSafeEqual(provBuf, tokenBuf)
+      );
+    };
+    const httpServer = http.createServer(async (req, res) => {
+      if (!authorized(req.headers["authorization"])) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      await transport.handleRequest(req, res);
+    });
+    httpServer.listen(Number(httpPort), host, () => {
+      console.error(
+        `[odoo-mcp] HTTP transport on http://${host}:${httpPort} (bearer auth required)`
+      );
+      if (host !== "127.0.0.1" && host !== "localhost") {
+        console.error(
+          "[security] WARNING: binding a non-loopback host — front with TLS; the bearer token is the only gate."
+        );
+      }
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  }
 }
 
 main().catch((err) => {
