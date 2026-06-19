@@ -97,7 +97,10 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
 - [ ] Pagination cursors; bulk create/update.
 - [x] `tests/lab-suite.mjs` — 16-assertion MCP suite (init/resources, security
       gates, readiness, read, scoped write, capability-gated reports, delete-block);
-      16/16 PASS on lab Odoo 19. CI wiring still TODO.
+      16/16 PASS on lab Odoo 19 (run via `npm run test:lab`).
+- [x] CI: `.github/workflows/ci.yml` — build + typecheck + unit tests (security
+      gates + sanitizer, no Odoo) on every push/PR. Lab-suite stays an integration
+      test (needs a live Odoo + the report data).
 - [ ] Richer `get_fields` (relations + selection values) for agent grounding.
 
 **T3 — deployment:**
