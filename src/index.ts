@@ -166,8 +166,18 @@ async function main() {
     );
   }
 
+  // Tool annotations: let MCP clients render/gate tools by behaviour.
+  const WRITE_TOOLS = new Set([
+    "create_record", "update_record", "post_message", "upload_attachment",
+  ]);
+  const DESTRUCTIVE_TOOLS = new Set(["delete_record", "execute_method"]);
+
   for (const { def, handler } of tools) {
-    server.tool(def.name, def.description, def.inputSchema, async (args: Record<string, unknown>) => {
+    const annotations = {
+      readOnlyHint: !WRITE_TOOLS.has(def.name) && !DESTRUCTIVE_TOOLS.has(def.name),
+      destructiveHint: DESTRUCTIVE_TOOLS.has(def.name),
+    };
+    server.registerTool(def.name, { description: def.description, inputSchema: def.inputSchema, annotations }, async (args: Record<string, unknown>) => {
       try {
         return await handler(odoo, args as Record<string, unknown>);
       } catch (err) {

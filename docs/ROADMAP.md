@@ -67,7 +67,8 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
       Added `OdooClient.callWebKw` (session auth + call_kw); the tool uses it when
       a password is available (ODOO_PASSWORD), else falls back to columns-only
       with a clear note. Verified: 11 P&L rows, figures matching the browser.
-- [ ] Tool annotations (`readOnlyHint` on all report tools).
+- [x] Tool annotations — `readOnlyHint`/`destructiveHint` on every tool (via
+      registerTool) so MCP clients can gate by behaviour.
 
 **T1b — readiness & ops (DONE):**
 - [x] `src/readiness.ts` + `check_readiness` (live self-test) + `get_readiness`
@@ -92,8 +93,9 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
       key, group grants) — the recommended path over a runtime tool.
 
 **T2 — safety + robustness:**
-- [ ] Per-model allow-list (`ODOO_MCP_ALLOWED_MODELS`) — app-level defence over
-      the Odoo ACL.
+- [x] Per-model allow-list (`ODOO_MCP_ALLOWED_MODELS`, exact + `prefix.*`) —
+      enforced at the client chokepoints (execute/jsonrpc/web), app-level defence
+      over the Odoo ACL. Unit-tested.
 - [ ] Pagination cursors; bulk create/update.
 - [x] `tests/lab-suite.mjs` — 16-assertion MCP suite (init/resources, security
       gates, readiness, read, scoped write, capability-gated reports, delete-block);

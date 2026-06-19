@@ -4,6 +4,16 @@ import type {
   OdooConnectionParams,
   OdooDomain,
 } from "./types.js";
+import { isModelAllowed } from "./security.js";
+
+/** App-level per-model allow-list guard (defence over the Odoo ACL). */
+function guardModel(model: string): void {
+  if (!isModelAllowed(model)) {
+    throw new Error(
+      `Model '${model}' is not permitted by ODOO_MCP_ALLOWED_MODELS.`
+    );
+  }
+}
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -167,6 +177,7 @@ export class OdooClient {
     kwargs: Record<string, unknown> = {}
   ): Promise<unknown> {
     if (!this.config) throw new Error("Not connected. Call connect() first.");
+    guardModel(model);
     const client = this.getObjectClient();
     return call(client, "execute_kw", [
       this.config.db,
@@ -201,6 +212,7 @@ export class OdooClient {
     kwargs: Record<string, unknown> = {}
   ): Promise<unknown> {
     if (!this.config) throw new Error("Not connected. Call connect() first.");
+    guardModel(model);
     const { url, db, uid, password } = this.config;
     const resp = await fetch(new URL("/jsonrpc", url).toString(), {
       method: "POST",
@@ -277,6 +289,7 @@ export class OdooClient {
     kwargs: Record<string, unknown> = {}
   ): Promise<unknown> {
     if (!this.config) throw new Error("Not connected.");
+    guardModel(model);
     const sess = await this.openWebSession();
     const { url } = this.config;
     const ctx = {

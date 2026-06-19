@@ -60,6 +60,26 @@ export function isMethodAllowed(model: string, method: string): boolean {
 }
 
 /**
+ * Per-model allow-list (app-level defence over the Odoo ACL). Parse
+ * ODOO_MCP_ALLOWED_MODELS (comma-separated). Entries may be exact (`res.partner`)
+ * or a dotted prefix wildcard (`account.*`). An empty value imposes no
+ * restriction — every model the Odoo user can reach is allowed.
+ */
+export function getAllowedModels(): string[] {
+  const raw = process.env.ODOO_MCP_ALLOWED_MODELS;
+  if (!raw) return [];
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+export function isModelAllowed(model: string): boolean {
+  const allow = getAllowedModels();
+  if (allow.length === 0) return true; // no allow-list → rely on Odoo ACL
+  return allow.some(
+    (p) => p === model || (p.endsWith(".*") && model.startsWith(p.slice(0, -1)))
+  );
+}
+
+/**
  * Refuse cleartext credentials: an http:// URL to a non-loopback host would send
  * the API key in the clear. Allowed only when ODOO_ALLOW_INSECURE is set (local
  * dev against a loopback-equivalent host).

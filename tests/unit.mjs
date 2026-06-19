@@ -29,3 +29,16 @@ test("sanitizer strips tracebacks + paths, keeps reason", () => {
   assert.ok(!c.includes("Traceback"));
   assert.ok(c.includes("required"));
 });
+
+test("model allow-list: empty = all allowed", () => {
+  delete process.env.ODOO_MCP_ALLOWED_MODELS;
+  assert.equal(s.isModelAllowed("account.move"), true);
+});
+test("model allow-list: exact + prefix wildcard", () => {
+  process.env.ODOO_MCP_ALLOWED_MODELS = "res.partner, account.*";
+  assert.equal(s.isModelAllowed("res.partner"), true);
+  assert.equal(s.isModelAllowed("account.move"), true);
+  assert.equal(s.isModelAllowed("account.move.line"), true);
+  assert.equal(s.isModelAllowed("sale.order"), false);
+  delete process.env.ODOO_MCP_ALLOWED_MODELS;
+});
