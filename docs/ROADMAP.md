@@ -60,9 +60,33 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
 **T1 — close the QuickBooks gap (financial reports):**
 - [x] `src/capabilities.ts` — connect-time module/record scan + cache (graceful per-probe degradation).
 - [x] `list_financial_reports` tool — discovery, capability-gated, proven on lab (MIS P&L/BS/CF + 6 OCA ledgers).
-- [ ] `run_financial_report` tool — MIS P&L/BS/Cash Flow first (the configured
-      Ledo instances), then OCA GL/TB/Aged, then Tax.
+- [~] `run_financial_report` tool — wired + capability-gated + JSON-RPC null-safe
+      path; MIS period columns resolve. FOLLOW-UP: MIS `compute()` returns an
+      empty matrix `body` across the `execute_kw` RPC boundary (works in-process)
+      — resolve via render-export parse or a call_kw body fix.
 - [ ] Tool annotations (`readOnlyHint` on all report tools).
+
+**T1b — readiness & ops (DONE):**
+- [x] `src/readiness.ts` + `check_readiness` (live self-test) + `get_readiness`
+      (cached). Reports status ready|degraded|not_ready, connection, security
+      posture, per-report availability+reason. Persisted to a local 600 file
+      (`ODOO_MCP_STATE_DIR`) — NOT in the ERP (least privilege; no prod pollution).
+- [ ] Best-practice enhancement: also expose readiness as an MCP **resource**
+      (`odoo://readiness`) + summarize in the `initialize` instructions, so the
+      agent pulls it as context without a tool call.
+
+**T-setup — can the MCP provision the ERP? (deliberate, gated, NOT runtime):**
+- The least-privilege runtime user must NOT self-provision (installing modules /
+  creating users / seeding MIS templates is admin-level and dangerous to expose
+  to an agent). Best practice: keep provisioning OUT of the runtime path.
+- [x] Diagnosis is the runtime job: `check_readiness` + `list_financial_reports`
+      already report what's missing + why (remediation reasons).
+- [ ] Optional admin-scoped `setup_*` toolset, registered ONLY when
+      `ODOO_MCP_ENABLE_SETUP=true` AND connected as an admin user (mirrors the
+      delete/exec gating): install missing modules, create the restricted user,
+      seed MIS P&L/BS templates. Default OFF.
+- [x] Provisioning already exists as separate odoo-shell scripts (mcp-bot user +
+      key, group grants) — the recommended path over a runtime tool.
 
 **T2 — safety + robustness:**
 - [ ] Per-model allow-list (`ODOO_MCP_ALLOWED_MODELS`) — app-level defence over

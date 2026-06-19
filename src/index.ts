@@ -27,7 +27,8 @@ import {
 } from "./tools/attachment.js";
 import { searchCalendarTool, handleSearchCalendar } from "./tools/calendar.js";
 import { whoamiTool, handleWhoami } from "./tools/whoami.js";
-import { listFinancialReportsTool, handleListFinancialReports } from "./tools/reports.js";
+import { listFinancialReportsTool, handleListFinancialReports, runFinancialReportTool, handleRunFinancialReport } from "./tools/reports.js";
+import { checkReadinessTool, handleCheckReadiness, getReadinessTool, handleGetReadiness } from "./tools/readiness.js";
 
 async function main() {
   const url = process.env.ODOO_URL;
@@ -98,6 +99,9 @@ async function main() {
     { def: searchCalendarTool, handler: handleSearchCalendar },
     { def: whoamiTool, handler: handleWhoami },
     { def: listFinancialReportsTool, handler: handleListFinancialReports },
+    { def: runFinancialReportTool, handler: handleRunFinancialReport },
+    { def: checkReadinessTool, handler: handleCheckReadiness },
+    { def: getReadinessTool, handler: handleGetReadiness },
   ];
 
   // delete_record: off unless ODOO_MCP_ENABLE_DELETE is set.

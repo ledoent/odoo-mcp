@@ -181,6 +181,46 @@ export class OdooClient {
     return this.execute(model, method, [ids, ...args], kwargs);
   }
 
+  /**
+   * Call a model method via Odoo's /jsonrpc endpoint instead of XML-RPC.
+   * Required for methods whose return contains `null` (e.g. MIS Builder
+   * compute()): XML-RPC rejects None-laden responses, JSON-RPC handles them.
+   */
+  async callKwJson(
+    model: string,
+    method: string,
+    args: unknown[] = [],
+    kwargs: Record<string, unknown> = {}
+  ): Promise<unknown> {
+    if (!this.config) throw new Error("Not connected. Call connect() first.");
+    const { url, db, uid, password } = this.config;
+    const resp = await fetch(new URL("/jsonrpc", url).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "call",
+        id: Math.floor(Date.now()),
+        params: {
+          service: "object",
+          method: "execute_kw",
+          args: [db, uid, password, model, method, args, kwargs],
+        },
+      }),
+      signal: AbortSignal.timeout(this.timeoutMs ?? 30000),
+    });
+    const data = (await resp.json()) as {
+      result?: unknown;
+      error?: { message?: string; data?: { message?: string } };
+    };
+    if (data.error) {
+      throw new Error(
+        data.error.data?.message || data.error.message || "JSON-RPC error"
+      );
+    }
+    return data.result;
+  }
+
   async searchRead(
     model: string,
     domain: OdooDomain = [],
