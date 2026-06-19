@@ -31,6 +31,11 @@ import { listFinancialReportsTool, handleListFinancialReports, runFinancialRepor
 import { checkReadinessTool, handleCheckReadiness, getReadinessTool, handleGetReadiness } from "./tools/readiness.js";
 import { computeReadiness, loadReadiness } from "./readiness.js";
 import { getReportCapabilities } from "./capabilities.js";
+import { isSetupEnabled } from "./security.js";
+import {
+  setupInstallModulesTool, handleSetupInstallModules,
+  setupCreateUserTool, handleSetupCreateUser,
+} from "./tools/setup.js";
 
 const SERVER_INSTRUCTIONS = `Odoo ERP MCP (read + scoped write).
 Start by reading the odoo://readiness resource (or calling check_readiness): it reports the connection, which financial reports are available (Profit & Loss / Balance Sheet / Cash Flow via MIS Builder, ledgers/aging via OCA, tax), and the security posture. Financial statements are NOT in the core report engine — discover them with list_financial_reports, then run_financial_report by instance name. Writes are scoped to the connected user's Odoo permissions; delete and arbitrary method execution are disabled unless explicitly enabled. Everything is bounded by the connected user's ACLs.`;
@@ -166,11 +171,23 @@ async function main() {
     );
   }
 
+  // setup_* provisioning tools: double-gated (env flag here + admin check at call
+  // time). Default off — provisioning is a deliberate step, not runtime surface.
+  if (isSetupEnabled()) {
+    tools.push({ def: setupInstallModulesTool, handler: handleSetupInstallModules });
+    tools.push({ def: setupCreateUserTool, handler: handleSetupCreateUser });
+    console.error(
+      "[security] setup_* tools ENABLED (admin-only; each call re-checks base.group_system)."
+    );
+  }
+
   // Tool annotations: let MCP clients render/gate tools by behaviour.
   const WRITE_TOOLS = new Set([
     "create_record", "update_record", "post_message", "upload_attachment",
   ]);
-  const DESTRUCTIVE_TOOLS = new Set(["delete_record", "execute_method"]);
+  const DESTRUCTIVE_TOOLS = new Set([
+    "delete_record", "execute_method", "setup_install_modules", "setup_create_user",
+  ]);
 
   for (const { def, handler } of tools) {
     const annotations = {

@@ -42,3 +42,11 @@ test("model allow-list: exact + prefix wildcard", () => {
   assert.equal(s.isModelAllowed("sale.order"), false);
   delete process.env.ODOO_MCP_ALLOWED_MODELS;
 });
+
+test("setup gate off by default, on when set", () => {
+  delete process.env.ODOO_MCP_ENABLE_SETUP;
+  assert.equal(s.isSetupEnabled(), false);
+  process.env.ODOO_MCP_ENABLE_SETUP = "true";
+  assert.equal(s.isSetupEnabled(), true);
+  delete process.env.ODOO_MCP_ENABLE_SETUP;
+});

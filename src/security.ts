@@ -18,6 +18,16 @@ export function isDeleteEnabled(): boolean {
   return envFlag("ODOO_MCP_ENABLE_DELETE");
 }
 
+/**
+ * Admin provisioning tools (setup_*) are registered only when
+ * ODOO_MCP_ENABLE_SETUP is truthy — AND each one re-checks at call time that the
+ * connected user is an admin. Default off: provisioning is a deliberate step, not
+ * part of the normal runtime surface.
+ */
+export function isSetupEnabled(): boolean {
+  return envFlag("ODOO_MCP_ENABLE_SETUP");
+}
+
 export interface MethodRule {
   model: string;
   method: string;

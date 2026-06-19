@@ -85,10 +85,11 @@ Verified in the real Ledo DB (US company, `l10n_us`, 350 accounts):
   to an agent). Best practice: keep provisioning OUT of the runtime path.
 - [x] Diagnosis is the runtime job: `check_readiness` + `list_financial_reports`
       already report what's missing + why (remediation reasons).
-- [ ] Optional admin-scoped `setup_*` toolset, registered ONLY when
-      `ODOO_MCP_ENABLE_SETUP=true` AND connected as an admin user (mirrors the
-      delete/exec gating): install missing modules, create the restricted user,
-      seed MIS P&L/BS templates. Default OFF.
+- [x] Admin-scoped `setup_*` toolset — DOUBLE-gated (ODOO_MCP_ENABLE_SETUP=true
+      to register + a runtime base.group_system admin check per call). Default
+      OFF. `setup_install_modules` (install apps) + `setup_create_user` (restricted
+      user + groups); both destructiveHint. Verified absent by default, present +
+      refused-for-non-admin when enabled.
 - [x] Provisioning already exists as separate odoo-shell scripts (mcp-bot user +
       key, group grants) — the recommended path over a runtime tool.
 
