@@ -3,3 +3,7 @@ dist/
 *.tsbuildinfo
 .env
 .env.*
+
+probe.mjs
+report_probe.mjs
+*.mjs.bak

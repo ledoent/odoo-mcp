@@ -27,6 +27,7 @@ import {
 } from "./tools/attachment.js";
 import { searchCalendarTool, handleSearchCalendar } from "./tools/calendar.js";
 import { whoamiTool, handleWhoami } from "./tools/whoami.js";
+import { listFinancialReportsTool, handleListFinancialReports } from "./tools/reports.js";
 
 async function main() {
   const url = process.env.ODOO_URL;
@@ -96,6 +97,7 @@ async function main() {
     { def: downloadAttachmentTool, handler: handleDownloadAttachment },
     { def: searchCalendarTool, handler: handleSearchCalendar },
     { def: whoamiTool, handler: handleWhoami },
+    { def: listFinancialReportsTool, handler: handleListFinancialReports },
   ];
 
   // delete_record: off unless ODOO_MCP_ENABLE_DELETE is set.
